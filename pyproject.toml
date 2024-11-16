@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clannotate"
+version = "0.1"
+authors = [{name="Matthijs Westera", email="m.westera@hum.leidenuniv.nl"}]
+description = "Textual app for data annotation."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["textual"]
+
+[project.scripts]
+clannotate = "clannotate:main"
+
+[project.urls]
+"Homepage" = "https://github.com/mwestera/clannotate"
+"Bug Tracker" = "https://github.com/mwestera/clannotate/issues"
