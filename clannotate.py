@@ -4,7 +4,7 @@ import os
 import json
 
 from textual.app import App, ComposeResult
-from textual.widgets import Static, Input, Button, ProgressBar, Rule, Footer, Header
+from textual.widgets import Markdown, Static, Input, Button, ProgressBar, Rule, Footer, Header
 from textual.containers import Vertical, Horizontal
 from textual import events, on
 
@@ -32,7 +32,7 @@ class AnnotationApp(App):
         self.annotations, self.current_index = self.load_progress() if os.path.exists(self.progress_file) else ([[None, ''] for _ in self.lines], 0)
 
         self.progress_bar = ProgressBar(len(self.lines), id='progress-bar', show_eta=False)
-        self.line_display = Static(id="line-display")
+        self.line_display = Markdown(id="line-display")
         self.line_input = Input(id="line-input")    # placeholder="Comment (optional)",
 
         self.line_display.styles.border = ("solid", "green")
@@ -183,6 +183,7 @@ def main():
     parser.add_argument('--csv', action='store_true', help='If input file has .csv format. Automatically inferred from file extension.')
     parser.add_argument('-y', '--yes', action='store_true', help='To overwrite savefile if exists.')
     parser.add_argument('-p', '--progress', required=False, type=str, default=None, help='Path to \'hidden\' file to save progress; default is input file with prefix .clanno_.')
+    parser.add_argument('--span_cols', required=False, type=str, default=None, help='Two column indices in the .csv input, separated by comma: a column containing spans (lists of dictionaries with "start" and "end" keys) and a column containing the text in which the spans live.')
     args = parser.parse_args()
 
     if args.file.name.endswith('.csv'):
@@ -193,6 +194,15 @@ def main():
         input(f'Savefile {args.progress} already exists. Hit enter to continue.')
 
     items = list(csv.reader(args.file) if args.csv else args.file)
+
+    if args.span_cols:
+        import spanviz
+        context_i, spans_i = (int(i) for i in args.span_cols.split(','))
+
+        for item in items:
+            print(item)
+            item[context_i] = spanviz.spans_to_md(item[context_i], json.loads(item[spans_i]))
+            del item[spans_i]
 
     app = AnnotationApp(items, args.progress)
 
