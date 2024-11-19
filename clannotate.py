@@ -201,7 +201,7 @@ def main():
 
         for item in items:
             print(item)
-            item[context_i] = spanviz.spans_to_md(item[context_i], json.loads(item[spans_i]))
+            item[context_i] = spanviz.spans_to_md(item[context_i], json.loads(item[spans_i]), with_labels=False)
             del item[spans_i]
 
     app = AnnotationApp(items, args.progress)
