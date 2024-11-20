@@ -200,7 +200,6 @@ def main():
         context_i, spans_i = (int(i) for i in args.span_cols.split(','))
 
         for item in items:
-            print(item)
             item[context_i] = spanviz.spans_to_md(item[context_i], json.loads(item[spans_i]), with_labels=False)
             del item[spans_i]
 
