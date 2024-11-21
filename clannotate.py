@@ -23,13 +23,14 @@ class AnnotationApp(App):
     }
     """
 
-    def __init__(self, items, progress_file=None):
+    def __init__(self, items, progress_file=None, rating_tiers=('rating',)):
         super().__init__()
 
         self.progress_file = progress_file
         self.lines = ['\n\n'.join(map(str, item)) for item in items]
+        self.rating_tiers = rating_tiers
 
-        self.annotations, self.current_index = self.load_progress() if os.path.exists(self.progress_file) else ([[None, ''] for _ in self.lines], 0)
+        self.annotations, self.current_index = self.load_progress() if os.path.exists(self.progress_file) else ([([None for _ in rating_tiers] + ['']) for _ in self.lines], 0)
 
         self.progress_bar = ProgressBar(len(self.lines), id='progress-bar', show_eta=False)
         self.line_display = Markdown(id="line-display")
@@ -43,16 +44,21 @@ class AnnotationApp(App):
         self.line_input.styles.padding = 0, 1, 0, 1
         self.line_input.styles.border = ("solid", "green")
 
-        bad_button = Button("Bad", id="bad-btn")
-        mwah_button = Button("Mwah", id="mwah-btn")
-        good_button = Button("Good", id="good-btn")
+        self.rating_button_groups = []
+        self.rating_panels = []
+
+        for i, rating_name in enumerate(rating_tiers):
+            bad_button = Button("Bad")
+            mwah_button = Button("Mwah")
+            good_button = Button("Good")
+            # TODO: Use an actual radio button group?
+            self.rating_button_groups.append([(bad_button, -1), (mwah_button, 0), (good_button, 1)])
+            self.rating_panels.append(Vertical(Static(rating_name), Horizontal(bad_button, mwah_button, good_button), id=f'panel{i}'))
+
         delete_button = Button("Delete", id="del-btn")
 
-        # TODO: Use an actual radio button group?
-        self.score_buttons = [(bad_button, -1), (mwah_button, 0), (good_button, 1)]
-
         self.buttonbar = Horizontal(
-                Horizontal(bad_button, mwah_button, good_button, id="choice"),
+                *self.rating_panels,
                 delete_button,
             )
         self.buttonbar.styles.margin = (1, 2, 0, 2)
@@ -78,13 +84,25 @@ class AnnotationApp(App):
             'alt+left': prev_button,
             'alt+up': home_button,
             'alt+down': end_button,
-            'f1': bad_button,
-            'f2': mwah_button,
-            'f3': good_button,
+            'f1': self.rating_button_groups[0][0][0],
+            'f2': self.rating_button_groups[0][1][0],
+            'f3': self.rating_button_groups[0][2][0],
             'alt+delete': delete_button,
             'ctrl+s': save_button,
-            'f5': load_button,
+            'ctrl+l': load_button,
         }
+        if len(self.rating_tiers) > 1:
+            self.hotkeys.update({
+                'f4': self.rating_button_groups[1][0][0],
+                'f5': self.rating_button_groups[1][1][0],
+                'f6': self.rating_button_groups[1][2][0],
+            })
+        if len(self.rating_tiers) > 2:
+            self.hotkeys.update({
+                'f7': self.rating_button_groups[2][0][0],
+                'f8': self.rating_button_groups[2][1][0],
+                'f9': self.rating_button_groups[2][2][0],
+            })
 
         for hotkey, button in self.hotkeys.items():
             button.tooltip = hotkey
@@ -102,25 +120,27 @@ class AnnotationApp(App):
         )
 
     def get_first_unannotated_index(self):
-        return self.annotations.index([None, '']) if [None, ''] in self.annotations else None
+        empty = ([None] * len(self.rating_button_groups)) + ['']
+        return self.annotations.index(empty) if empty in self.annotations else None
 
     @on(Input.Changed)
     def save_input(self, event: Input.Changed) -> None:
         if event.input == self.line_input:
-            self.annotations[self.current_index][1] = event.value
+            self.annotations[self.current_index][-1] = event.value
 
     async def on_button_pressed(self, event):
-        for button, score in self.score_buttons:
-            if event.button == button:
-                if self.annotations[self.current_index][0] == score:
-                    self.annotations[self.current_index][0] = None
-                else:
-                    self.annotations[self.current_index][0] = score
-                self.update()
-                return
+        for i, rating_button_group in enumerate(self.rating_button_groups):
+            for button, rating in rating_button_group:
+                if event.button == button:
+                    if self.annotations[self.current_index][i] == rating:
+                        self.annotations[self.current_index][i] = None
+                    else:
+                        self.annotations[self.current_index][i] = rating
+                    self.update()
+                    return
 
         if event.button.id == "del-btn":
-            self.annotations[self.current_index] = [None, '']
+            self.annotations[self.current_index] = [None for _ in self.rating_button_groups] + ['']
             self.line_input.value = ''
         elif event.button.id == "home-btn":
             self.current_index = 0
@@ -136,7 +156,6 @@ class AnnotationApp(App):
             self.save_progress()
         elif event.button.id == "load-btn":
             self.annotations, self.current_index = self.load_progress()
-
         else:
             return
 
@@ -148,21 +167,23 @@ class AnnotationApp(App):
 
         self.current_index = self.current_index % len(self.lines)
 
-        self.progress_bar.update(progress=sum(a[0] is not None for a in self.annotations))
+        self.progress_bar.update(progress=sum(any(x for x in a) for a in self.annotations))
         self.line_display.border_title = f'Item {self.current_index}.'
 
-        self.line_input.value = self.annotations[self.current_index][1]
+        self.line_input.value = self.annotations[self.current_index][-1]
         self.line_input.focus()
         self.line_display.update(self.lines[self.current_index])
 
-        for button, score in self.score_buttons:
-            button.variant = 'success' if self.annotations[self.current_index][0] == score else 'default'
+        for i, button_group in enumerate(self.rating_button_groups):
+            for button, score in button_group:
+                button.variant = 'success' if self.annotations[self.current_index][i] == score else 'default'
 
     async def on_key(self, event: events.Key) -> None:
         if button := self.hotkeys.get(event.key):
             button.press()
 
     def save_progress(self):
+        # TODO: Save more info about the annotations, like rating tiers?
         with open(self.progress_file, 'w') as file:
             file.write(json.dumps(
                 {'annotations': self.annotations, 'current_index': self.current_index}
@@ -183,6 +204,7 @@ def main():
     parser.add_argument('--csv', action='store_true', help='If input file has .csv format. Automatically inferred from file extension.')
     parser.add_argument('-y', '--yes', action='store_true', help='To overwrite savefile if exists.')
     parser.add_argument('-p', '--progress', required=False, type=str, default=None, help='Path to \'hidden\' file to save progress; default is input file with prefix .clanno_.')
+    parser.add_argument('-t', '--tiers', required=False, nargs='*', type=str, default=['rating'], help='Names of the rating tiers to include (default: one scale called \'rating\').')
     parser.add_argument('--span_cols', required=False, type=str, default=None, help='Two column indices in the .csv input, separated by comma: a column containing spans (lists of dictionaries with "start" and "end" keys) and a column containing the text in which the spans live.')
     args = parser.parse_args()
 
@@ -203,7 +225,7 @@ def main():
             item[context_i] = spanviz.spans_to_md(item[context_i], json.loads(item[spans_i]), with_labels=False)
             del item[spans_i]
 
-    app = AnnotationApp(items, args.progress)
+    app = AnnotationApp(items, args.progress, rating_tiers=args.tiers)
 
     try:
         app.run()
@@ -211,7 +233,7 @@ def main():
         pass
     finally:
         app.save_progress()
-        csv.writer(sys.stdout).writerows(app.annotations)
+        csv.writer(sys.stdout).writerows(app.annotations)   # TODO: With --tiers given, maybe output json?
 
 
 if __name__ == "__main__":
