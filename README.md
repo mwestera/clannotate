@@ -5,7 +5,7 @@ It reads lines from a (.txt or .csv) file or pipe, starts an annotation interfac
 ## Install
 
 ```bash
-$ pip intall git+https://github.com/mwestera/clannotate
+$ pip install git+https://github.com/mwestera/clannotate
 ```
 
 ## Use
