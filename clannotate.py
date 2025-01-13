@@ -205,8 +205,10 @@ def main():
     parser.add_argument('-y', '--yes', action='store_true', help='To overwrite savefile if exists.')
     parser.add_argument('-p', '--progress', required=False, type=str, default=None, help='Path to \'hidden\' file to save progress; default is input file with prefix .clanno_.')
     parser.add_argument('-t', '--tiers', required=False, nargs='*', type=str, default=['rating'], help='Names of the rating tiers to include (default: one scale called \'rating\').')
-    parser.add_argument('--span_cols', required=False, type=str, default=None, help='Two column indices in the .csv input, separated by comma: a column containing spans (lists of dictionaries with "start" and "end" keys) and a column containing the text in which the spans live.')
+    parser.add_argument('--span_cols', required=False, type=str, default=None, help='Two column indices in the .csv input, separated by comma: a column containing potentially discontinuous spans (each disco-span a list of of dictionaries with "start" and "end" keys) and a column containing the text in which the spans live.')
     args = parser.parse_args()
+
+    # TODO: More flexibility input format
 
     if args.file.name.endswith('.csv'):
         args.csv = True
